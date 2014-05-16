@@ -35,7 +35,7 @@ public class User {
       output.close();
       socket.close();
     } catch (IOException e) {
-      ConsoleLog.errorPrint(userName + "close socket fail");
+      ConsoleLog.errorPrint(userName + " faile to close socket");
       e.printStackTrace();
     }
 
