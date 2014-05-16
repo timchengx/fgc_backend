@@ -24,7 +24,7 @@ public class AuthenticationSession implements Runnable {
 
       //assume auth ok
       new Thread(new MatchingSession(user, gameID)).start();
-      
+      user.setInformation("user001", "gameid001");
       // if not...
 //      user.send(JSON.jsonResultFalse());
 //      user.close();

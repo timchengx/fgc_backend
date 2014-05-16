@@ -6,11 +6,14 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
+import com.fgc.tools.ConsoleLog;
+
 public class User {
   private Socket socket;
   private BufferedReader input;
   private PrintWriter output;
-  private String userName = "default";
+  private String userName;
+  private String gameID;
 
   public User(Socket socket) throws IOException {
     this.socket = socket;
@@ -26,11 +29,29 @@ public class User {
     return input.readLine();
   }
 
-  public void close() throws IOException {
-    input.close();
-    output.close();
-    socket.close();
+  public void close() {
+    try {
+      input.close();
+      output.close();
+      socket.close();
+    } catch (IOException e) {
+      ConsoleLog.errorPrint(userName + "close socket fail");
+      e.printStackTrace();
+    }
 
+  }
+
+  public String getName() {
+    return userName;
+  }
+
+  public String getID() {
+    return gameID;
+  }
+
+  public void setInformation(String user, String game) {
+    userName = user;
+    gameID = game;
   }
 
 }

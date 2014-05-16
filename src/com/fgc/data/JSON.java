@@ -10,6 +10,11 @@ public class JSON {
   public static final String KEY_ID = "id";
   public static final String KEY_INVITE = "invite";
   public static final String KEY_ACCEPT = "accept";
+  public static final String KEY_RESULTID = "resultID";
+  public static final String KEY_WHOFIRST = "whoFirst";
+  public static final String KEY_DATA = "data";
+  public static final String KEY_PUTITTHERE = "PutItThere";
+  public static final String KEY_WINNER = "WINNER";
 
   public static JSONObject jsonResultTrue() {
     JSONObject json = new JSONObject();
@@ -25,6 +30,11 @@ public class JSON {
   public static JSONObject jsonIDObject(String id) {
     JSONObject json = new JSONObject();
     json.put(KEY_ID, id);
+    return json;
+  }
+  public static JSONObject jsonResultObject(int resultID) {
+    JSONObject json = new JSONObject();
+    json.put(JSON.KEY_RESULTID, resultID);
     return json;
   }
 }
