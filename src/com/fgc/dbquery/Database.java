@@ -8,7 +8,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import com.fgc.tools.ConsoleLog;
 
 public class Database implements Runnable {
-  private static boolean hack = false;
   private static String connectionURL = null;
   private static final String driverName = "com.mysql.jdbc.Driver";
   private static int connectPoolSize;
@@ -32,6 +31,7 @@ public class Database implements Runnable {
     } catch (Exception e) {
       ConsoleLog.errorPrint("Can't load" + driverName);
       e.printStackTrace();
+      System.exit(-1);
     }
   }
 

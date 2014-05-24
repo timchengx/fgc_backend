@@ -3,19 +3,30 @@ package com.fgc.tools;
 import java.io.IOException;
 
 import com.fgc.backend.SocketListener;
+import com.fgc.dbquery.Database;
 
 
 public class main {
   public static void main(String[] args) {
     System.setProperty("file.encoding", "UTF-8");
-    if (args.length < 1)
-      ConsoleLog.println("please enter port number");
+    if (args.length != 7)
+      ConsoleLog.println("<server port> <DB address> <schema name> <DB user> <DB password> <connection pool size> <pool clean interval(ms)> ");
     else {
       try {
         int port = Integer.parseInt(args[0]);
+        String location = args[1];
+        String dbname = args[2];
+        String username = args[3];
+        String pass = args[4];
+        int size = Integer.parseInt(args[5]);
+        long sleep = Long.parseLong(args[6]);
+        Database.setDatabase(location, dbname, username, pass, size, sleep);
+        Database.startCleanPool();
         new Thread(new SocketListener(port)).start();
+        ConsoleLog.println("FGC backend Ready.");
       } catch (NumberFormatException e) {
-        ConsoleLog.println("please enter port number");
+        ConsoleLog.println("please enter valid number!");
+        e.printStackTrace();
       } catch (IOException e) {
         ConsoleLog.errorPrint("Fail to create ServerSocket!!!");
         e.printStackTrace();

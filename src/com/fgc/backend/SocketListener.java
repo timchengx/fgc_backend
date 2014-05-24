@@ -15,17 +15,13 @@ public class SocketListener implements Runnable {
 
   @Override
   public void run() {
-    try {
-      new AuthenticationSession(new User(serverSocket.accept()));
-    } catch (IOException e) {
-      ConsoleLog.println("First User fail to connect");
-      e.printStackTrace();
-    }
-    try {
-      new AuthenticationSession(new User(serverSocket.accept()));
-    } catch (IOException e) {
-      ConsoleLog.println("Second User fail to connect");
-      e.printStackTrace();
+    while(true) {
+      try {
+        new AuthenticationSession(new User(serverSocket.accept()));
+      } catch (IOException e) {
+        ConsoleLog.errorPrint("A User fail to connect");
+        e.printStackTrace();
+      }
     }
   }
 
