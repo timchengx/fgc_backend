@@ -8,8 +8,10 @@ import org.json.JSONObject;
 import com.fgc.data.GameRooms;
 import com.fgc.data.JSON;
 import com.fgc.data.User;
+import com.fgc.data.WaitingReplyUsers;
+import com.fgc.dbquery.MatchingGames;
+import com.fgc.dbquery.MatchingSQLAction;
 import com.fgc.tools.ConsoleLog;
-import com.fgc.tools.Database;
 
 public class MatchingSession implements Runnable {
   private User user;
@@ -18,83 +20,94 @@ public class MatchingSession implements Runnable {
   private JSONObject listJSON;
   private JSONArray arrayJSON;
   private JSONObject replyJSON;
-  public static final long SLEEPTIME = 1000;
+  public static long SLEEPTIME = 30000;
+  private MatchingSQLAction sqlData;
+  private boolean isFirstRun;
+
+  public static void setSleepTime(long time) {
+    SLEEPTIME = time;
+  }
 
   public MatchingSession(User client, String id) {
     user = client;
     gameID = id;
+    isFirstRun = true;
   }
 
   @Override
   public void run() {
-    // run sql query...
-    listJSON = JSON.jsonResultTrue();
-    arrayJSON = new JSONArray();
-    // fake some id...
-    arrayJSON.put(JSON.jsonIDObject("aaa"));
-    arrayJSON.put(JSON.jsonIDObject("bbb"));
-    arrayJSON.put(JSON.jsonIDObject("ccc"));
-    arrayJSON.put(JSON.jsonIDObject("ddd"));
-    listJSON.put(JSON.KEY_LIST, arrayJSON);
-    sendReceive();
-    getInviteID();
 
+    if (isFirstRun) {
+      sqlData = MatchingGames.getMatchingList(gameID);
+      listJSON = JSON.createResultTrue();
+      sqlData.joinGame(user.getGameID());
+      isFirstRun = false;
+    } else
+      listJSON = JSON.createResultObject(2);
+    while (true) {
+      arrayJSON = sqlData.getList();
+      removeSelfInJSON();
 
-    // simulate resultID 2
-    listJSON = JSON.jsonResultObject(2);
-    listJSON.put(JSON.KEY_LIST, arrayJSON);
-    sendReceive();
-    getInviteID();
+      while (arrayJSON.length() == 0) {
+        listJSON.put(JSON.KEY_LIST, JSONObject.NULL);
+        user.send(listJSON.toString());
+        try {
+          Thread.sleep(SLEEPTIME);
+        } catch (InterruptedException e) {
+          ConsoleLog.errorPrint(getClass().getSimpleName() + "with user " + user.getGameID()
+              + "in game " + gameID + "Thread sleep fail");
+          e.printStackTrace();
+        }
+        arrayJSON = sqlData.getList();
+        removeSelfInJSON();
+        listJSON.remove(JSON.KEY_LIST);
+      }
 
-    // simulate resultID 1
-    listJSON = JSON.jsonResultObject(1);
-    listJSON.put(JSON.KEY_ID, "liquidT");
-    sendReceive();
-
-    if (!isAccept()) {
-      listJSON = JSON.jsonResultObject(2);
       listJSON.put(JSON.KEY_LIST, arrayJSON);
       sendReceive();
       getInviteID();
-    }
+      String result = sqlData.putRequest(user.getGameID(), getInviteID(), false);
 
-    listJSON = JSON.jsonResultObject(0);
-    sendReceive();
-
-    if (Database.hackhackhack()) {
-      GameRooms.putRoom(user.getName(), new GameRoomSession(user));
-    } else {
-      GameRoomSession room;
-      while (true) {
-        room = GameRooms.getRoom(getInviteID());
-        if (room == null)
-          try {
-            Thread.sleep(SLEEPTIME);
-          } catch (InterruptedException e) {
-            ConsoleLog.errorPrint(user.getName() + " in " + getClass().getName() + " sleep fail.");
-            user.close();
-          }
+      if (result.equals(MatchingSQLAction.PUTREQUEST_RESULT2)) {
+        listJSON = JSON.createResultObject(2);
+      } else if (!result.equals(MatchingSQLAction.PUTREQUEST_COMPLETE)) {
+        listJSON = JSON.createResultObject(1);
+        listJSON.put(JSON.KEY_ID, result);
+        sendReceive();
+        boolean acceptOrNot = isAccept();
+        WaitingReplyUsers.getUser(result).receiveInviteReply(acceptOrNot);
+        if(!acceptOrNot)
+          listJSON = JSON.createResultObject(2);
         else {
+          GameRoomSession room = GameRooms.getRoom(result);
           room.joinRoom(user);
           new Thread(room).start();
+          sqlData.putRequest(result, user.getGameName(), true);
           break;
         }
-      }
+      } else
+        break;
     }
   }
 
-  // DIRTY HACKKKKKKKKKKK
   private void sendReceive() {
     user.send(listJSON.toString());
 
     try {
       userReply = user.receive();
     } catch (IOException e) {
-      ConsoleLog.errorPrint(user.getName() + "disconnect in Matching");
+      ConsoleLog.errorPrint(user.getGameName() + "disconnect in Matching");
       user.close();
       e.printStackTrace();
       return;
     }
+  }
+
+  public void receiveInviteReply(boolean result) {
+    if (result) {
+      GameRooms.putRoom(user.getGameName(), new GameRoomSession(user));
+    } else
+      new Thread(this).start();
   }
 
   private String getInviteID() {
@@ -105,6 +118,17 @@ public class MatchingSession implements Runnable {
   private boolean isAccept() {
     replyJSON = new JSONObject(userReply);
     return replyJSON.getBoolean(JSON.KEY_ACCEPT); // check has require data...
+  }
+
+  private void removeSelfInJSON() {
+    if (arrayJSON.length() != 0) {
+      for (int i = 0; i < arrayJSON.length(); i++) {
+        if (arrayJSON.getJSONObject(i).getString(JSON.KEY_ID).equals(user.getGameName())) {
+          arrayJSON.remove(i);
+          break;
+        }
+      }
+    }
   }
 
 }

@@ -12,7 +12,7 @@ public class User {
   private Socket socket;
   private BufferedReader input;
   private PrintWriter output;
-  private String userName;
+  private String userGameName;
   private String gameID;
 
   public User(Socket socket) throws IOException {
@@ -35,22 +35,22 @@ public class User {
       output.close();
       socket.close();
     } catch (IOException e) {
-      ConsoleLog.errorPrint(userName + " faile to close socket");
+      ConsoleLog.errorPrint(userGameName + " fail to close socket");
       e.printStackTrace();
     }
 
   }
 
-  public String getName() {
-    return userName;
+  public String getGameName() {
+    return userGameName;
   }
 
-  public String getID() {
+  public String getGameID() {
     return gameID;
   }
 
   public void setInformation(String user, String game) {
-    userName = user;
+    userGameName = user;
     gameID = game;
   }
 

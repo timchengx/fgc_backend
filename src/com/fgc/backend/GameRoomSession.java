@@ -8,6 +8,8 @@ import org.json.JSONObject;
 import com.fgc.data.GameRooms;
 import com.fgc.data.JSON;
 import com.fgc.data.User;
+import com.fgc.dbquery.GamingSQLAction;
+import com.fgc.tools.ConsoleLog;
 
 public class GameRoomSession implements Runnable {
   private static Random dice = new Random();
@@ -15,10 +17,13 @@ public class GameRoomSession implements Runnable {
   private User secondUser;
   private JSONObject firstUserData;
   private JSONObject secondUserData;
+  private String gameID;
+  private int sqlRoomID;
   boolean firstUserFirst;
 
   public GameRoomSession(User first) {
     firstUser = first;
+    gameID = first.getGameID();
   }
 
   public void joinRoom(User second) {
@@ -28,13 +33,40 @@ public class GameRoomSession implements Runnable {
   @Override
   public void run() {
 
+    GamingSQLAction.removeFromQueue(gameID, firstUser.getGameName());
+    GamingSQLAction.removeFromQueue(gameID, secondUser.getGameName());
+    GamingSQLAction.addGameCount(gameID, firstUser.getGameName());
+    GamingSQLAction.addGameCount(gameID, secondUser.getGameName());
+
     sendWhoFirst();
     if (!firstUserFirst) {
-      secondUserReceive();
+      sqlRoomID =
+          GamingSQLAction.createGameRecord(gameID, secondUser.getGameName(),
+              firstUser.getGameName());
+      try {
+        secondUserReceive();
+      } catch (IOException e) {
+        ConsoleLog.errorPrint(secondUser.getGameID() + " with " + firstUser.getGameID()
+            + "suddenly disconnect in game " + gameID);
+        e.printStackTrace();
+        disconnect(false);
+        return;
+      }
       firstUser.send(secondUserData.toString());
-    }
+    } else
+      sqlRoomID =
+          GamingSQLAction.createGameRecord(gameID, firstUser.getGameName(),
+              secondUser.getGameName());
     while (true) {
-      firstUserReceive();
+      try {
+        firstUserReceive();
+      } catch (IOException e) {
+        ConsoleLog.errorPrint(firstUser.getGameID() + " with " + secondUser.getGameID()
+            + "suddenly disconnect in game " + gameID);
+        e.printStackTrace();
+        disconnect(true);
+        return;
+      }
       if (firstUserData.has(JSON.KEY_WINNER)) {
         gameFinish(true);
         break;
@@ -45,52 +77,79 @@ public class GameRoomSession implements Runnable {
 
       firstUser.send(secondUserData.toString());
 
-      secondUserReceive();
+      try {
+        secondUserReceive();
+      } catch (IOException e) {
+        ConsoleLog.errorPrint(secondUser.getGameID() + " with " + firstUser.getGameID()
+            + "suddenly disconnect in game " + gameID);
+        e.printStackTrace();
+        disconnect(false);
+        return;
+      }
       if (secondUserData.has(JSON.KEY_WINNER)) {
         gameFinish(false);
         break;
       }
-
       secondUser.send(firstUserData.toString());
-
     }
 
 
   }
 
   private void writeToSQL(JSONObject data) {
-    // run some sql...
+    GamingSQLAction.appendGameRecord(sqlRoomID, data.getString(JSON.KEY_DATA));
   }
 
   private void gameFinish(boolean isFirstUserSend) {
     String winner;
     if (isFirstUserSend) {
       winner = firstUserData.getString(JSON.KEY_WINNER);
-      firstUser.send(JSON.jsonResultTrue().toString());
+      firstUser.send(JSON.createResultTrue().toString());
       firstUser.close();
     } else {
       winner = secondUserData.getString(JSON.KEY_WINNER);
-      secondUser.send(JSON.jsonResultTrue().toString());
+      secondUser.send(JSON.createResultTrue().toString());
       secondUser.close();
     }
     // wait another user send finish...
     if (isFirstUserSend) {
       secondUserData = null;
-      secondUserReceive();
-      if (secondUserData == null || !secondUserData.has(JSON.KEY_WINNER)
-          || !winner.equals(secondUserData.getString(JSON.KEY_WINNER))) {
-        // error... write to sql
-      } else {
-        // ok... write to sql...
+      try {
+        secondUserReceive();
+        if (secondUserData == null || !secondUserData.has(JSON.KEY_WINNER)
+            || !winner.equals(secondUserData.getString(JSON.KEY_WINNER))) {
+          // error... do nothing
+        } else {
+          GamingSQLAction.setGameResult(gameID, winner, true);
+          if (winner.equals(firstUser.getGameName()))
+            GamingSQLAction.setGameResult(gameID, secondUser.getGameName(), false);
+          else
+            GamingSQLAction.setGameResult(gameID, firstUser.getGameName(), false);
+        }
+      } catch (IOException e) {
+        ConsoleLog.errorPrint(secondUser.getGameName() + "in game " + gameID
+            + "disconnect without send winner message");
+        e.printStackTrace();
       }
+
     } else {
       firstUserData = null;
-      firstUserReceive();
+      try {
+        firstUserReceive();
+      } catch (IOException e) {
+        ConsoleLog.errorPrint(firstUser.getGameName() + "in game " + gameID
+            + "disconnect without send winner message");
+        e.printStackTrace();
+      }
       if (firstUserData == null || !secondUserData.has(JSON.KEY_WINNER)
           || !winner.equals(firstUserData.getString(JSON.KEY_WINNER))) {
-        // error... write to sql
+        // error... do nothing
       } else {
-        // ok... write to sql...
+        GamingSQLAction.setGameResult(gameID, winner, true);
+        if (winner.equals(firstUser.getGameName()))
+          GamingSQLAction.setGameResult(gameID, secondUser.getGameName(), false);
+        else
+          GamingSQLAction.setGameResult(gameID, firstUser.getGameName(), false);
       }
     }
     closeRoom();
@@ -100,42 +159,31 @@ public class GameRoomSession implements Runnable {
     JSONObject passData;
     firstUserFirst = dice.nextBoolean();
 
-    passData = JSON.jsonIDObject(secondUser.getID());
+    passData = JSON.createIDObject(secondUser.getGameID());
     passData.put(JSON.KEY_WHOFIRST, firstUserFirst);
     firstUser.send(passData.toString());
 
-    passData = JSON.jsonIDObject(firstUser.getID());
+    passData = JSON.createIDObject(firstUser.getGameID());
     passData.put(JSON.KEY_WHOFIRST, !firstUserFirst);
     secondUser.send(passData.toString());
 
   }
 
-  private void secondUserReceive() {
-    try {
-      secondUserData = new JSONObject(secondUser.receive());
-
-    } catch (IOException e) {
-      disconnect(false);
-      e.printStackTrace();
-    }
+  private void secondUserReceive() throws IOException {
+    secondUserData = new JSONObject(secondUser.receive());
   }
 
-  private void firstUserReceive() {
-    try {
-      firstUserData = new JSONObject(firstUser.receive());
-    } catch (IOException e) {
-      disconnect(true);
-      e.printStackTrace();
-    }
+  private void firstUserReceive() throws IOException {
+    firstUserData = new JSONObject(firstUser.receive());
   }
 
   private void closeRoom() {
-    remove();
-    // do some sql...
+    remoteRoomFromGameRooms();
+    GamingSQLAction.finishGame(sqlRoomID);
   }
 
   private void disconnect(boolean isFirst) {
-    JSONObject finalResult = JSON.jsonResultTrue();
+    JSONObject finalResult = JSON.createResultTrue();
     if (isFirst) {
       firstUser.close();
       secondUser.send(finalResult.toString());
@@ -145,11 +193,12 @@ public class GameRoomSession implements Runnable {
       firstUser.send(finalResult.toString());
       firstUser.close();
     }
-    remove();
+    remoteRoomFromGameRooms();
+    GamingSQLAction.finishGame(sqlRoomID);
   }
 
-  private void remove() {
-    GameRooms.removeRoom(firstUser.getName());
+  private void remoteRoomFromGameRooms() {
+    GameRooms.removeRoom(firstUser.getGameName());
   }
 
 }

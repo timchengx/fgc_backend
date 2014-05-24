@@ -20,6 +20,13 @@ public class ConsoleLog {
   }
   public static void errorPrint(String message) {
     printTime();
-    System.out.println("ERROR: " + message);
+    System.err.println("ERROR: " + message);
+  }
+  public static void sqlErrorPrint(String message) {
+    errorPrint("when query db, " + message);
+  }
+  public static void sqlErrorPrint(String statement, String strings) {
+    String message = "statement = " + statement + "with string = " + strings;
+    sqlErrorPrint(message);
   }
 }

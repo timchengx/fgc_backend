@@ -4,6 +4,7 @@ import org.json.JSONObject;
 
 import com.fgc.data.JSON;
 import com.fgc.data.User;
+import com.fgc.dbquery.LoginSQLCheck;
 import com.fgc.tools.ConsoleLog;
 
 public class AuthenticationSession implements Runnable {
@@ -20,17 +21,19 @@ public class AuthenticationSession implements Runnable {
       JSONObject loginJSON = new JSONObject(loginString);
       String token = loginJSON.getString(JSON.KEY_TOKEN);
       String gameID = loginJSON.getString(JSON.KEY_GAMEID);
-      // run sql check login....
-
-      //assume auth ok
-      new Thread(new MatchingSession(user, gameID)).start();
-      user.setInformation("user001", "gameid001");
-      // if not...
-//      user.send(JSON.jsonResultFalse());
-//      user.close();
+      String gameName = LoginSQLCheck.login(token, gameID);
+      if(gameName != null) {
+        user.setInformation(gameName, gameID);
+        new Thread(new MatchingSession(user, gameID)).start();
+      } else {
+         throw new Exception();
+      }
+      
     } catch (Exception e) {
       ConsoleLog.errorPrint("Fail to get an user's login information");
       e.printStackTrace();
+      user.send(JSON.createResultFalse().toString());
+      user.close();
       return;
     }
   }

@@ -16,25 +16,26 @@ public class JSON {
   public static final String KEY_PUTITTHERE = "PutItThere";
   public static final String KEY_WINNER = "WINNER";
 
-  public static JSONObject jsonResultTrue() {
+  public static JSONObject createResultTrue() {
     JSONObject json = new JSONObject();
     json.put("result", true);
     return json;
   }
 
-  public static JSONObject jsonResultFalse() {
+  public static JSONObject createResultFalse() {
     JSONObject json = new JSONObject();
     json.put(KEY_RESULT, false);
     return json;
   }
-  public static JSONObject jsonIDObject(String id) {
+  public static JSONObject createIDObject(String id) {
     JSONObject json = new JSONObject();
     json.put(KEY_ID, id);
     return json;
   }
-  public static JSONObject jsonResultObject(int resultID) {
+  public static JSONObject createResultObject(int resultID) {
     JSONObject json = new JSONObject();
     json.put(JSON.KEY_RESULTID, resultID);
     return json;
   }
+  
 }
