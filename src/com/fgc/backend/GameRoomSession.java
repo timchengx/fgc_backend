@@ -43,7 +43,7 @@ public class GameRoomSession implements Runnable {
         writeToSQL(firstUserData);
       }
 
-      firstUser.send(secondUserData.toString());
+      secondUser.send(firstUserData.toString());
 
       secondUserReceive();
       if (secondUserData.has(JSON.KEY_WINNER)) {
@@ -51,7 +51,7 @@ public class GameRoomSession implements Runnable {
         break;
       }
 
-      secondUser.send(firstUserData.toString());
+      firstUser.send(secondUserData.toString());
 
     }
 
