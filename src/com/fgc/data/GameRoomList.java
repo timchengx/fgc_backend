@@ -4,7 +4,7 @@ import java.util.HashMap;
 
 import com.fgc.backend.GameRoomSession;
 
-public class GameRooms {
+public class GameRoomList {
   private static HashMap<String, GameRoomSession> table;
   static {
     table = new HashMap<String, GameRoomSession>();

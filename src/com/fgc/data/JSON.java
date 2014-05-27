@@ -14,7 +14,7 @@ public class JSON {
   public static final String KEY_WHOFIRST = "whoFirst";
   public static final String KEY_DATA = "data";
   public static final String KEY_PUTITTHERE = "PutItThere";
-  public static final String KEY_WINNER = "WINNER";
+  public static final String KEY_WINNER = "winner";
 
   public static JSONObject createResultTrue() {
     JSONObject json = new JSONObject();

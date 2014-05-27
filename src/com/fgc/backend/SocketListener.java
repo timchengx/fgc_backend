@@ -17,7 +17,7 @@ public class SocketListener implements Runnable {
   public void run() {
     while(true) {
       try {
-        new AuthenticationSession(new User(serverSocket.accept()));
+        new Thread(new AuthenticationSession(new User(serverSocket.accept()))).start();
       } catch (IOException e) {
         ConsoleLog.errorPrint("A User fail to connect");
         e.printStackTrace();

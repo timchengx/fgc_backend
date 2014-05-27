@@ -41,7 +41,7 @@ public class User {
 
   }
 
-  public String getGameName() {
+  public String getUserGameName() {
     return userGameName;
   }
 

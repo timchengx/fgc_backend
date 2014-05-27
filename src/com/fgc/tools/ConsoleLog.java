@@ -6,17 +6,15 @@ import java.util.Date;
 
 public class ConsoleLog {
   private static DateFormat dateFormat;
-  private static Date date;
   static {
     dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-    date = new Date();
   }
   public static void println(String print) {
     printTime();
     System.out.println(print);
   }
   private static void printTime() {
-    System.out.print(dateFormat.format(date) + ": ");
+    System.out.print(dateFormat.format(new Date()) + ": ");
   }
   public static void errorPrint(String message) {
     printTime();
@@ -28,5 +26,8 @@ public class ConsoleLog {
   public static void sqlErrorPrint(String statement, String strings) {
     String message = "statement = " + statement + "with string = " + strings;
     sqlErrorPrint(message);
+  }
+  public static void gameIDPrint(String gameID, String message) {
+    println(gameID + ": " + message);
   }
 }

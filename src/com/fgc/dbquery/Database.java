@@ -26,8 +26,6 @@ public class Database implements Runnable {
     availablePool = new ConcurrentLinkedQueue<Connection>();
     try {
       Class.forName(driverName).newInstance();
-      for (int i = 0; i < connectPoolSize; i++)
-        availablePool.add(createConnection());
     } catch (Exception e) {
       ConsoleLog.errorPrint("Can't load" + driverName);
       e.printStackTrace();
@@ -35,7 +33,7 @@ public class Database implements Runnable {
     }
   }
 
-  public static void startCleanPool() {
+  public static void startDatabase() {
     if (!isRunning)
       new Thread(new Database()).start();
     isRunning = true;
@@ -47,7 +45,7 @@ public class Database implements Runnable {
       connection = DriverManager.getConnection(connectionURL);
     } catch (SQLException e) {
       ConsoleLog.errorPrint("Fail to open Database Connection");
-      e.printStackTrace();
+      System.exit(-1);
     }
     return connection;
   }
@@ -57,30 +55,34 @@ public class Database implements Runnable {
     if (connection == null) {
       connection = createConnection();
       usingPool.add(connection);
-      ConsoleLog.println("created a SQL connection, current connection: "
+      ConsoleLog.println("A new SQL connection has been created, current connection: "
           + (availablePool.size() + usingPool.size()));
     }
     return connection;
   }
 
-  public static void returnConnection(Connection connection) {
+  public synchronized static void returnConnection(Connection connection) {
     if (connection != null) {
-      usingPool.remove(connection);
-      availablePool.add(connection);
+      if (usingPool.contains(connection))
+        usingPool.remove(connection);
+      if (!availablePool.contains(connection))
+        availablePool.add(connection);
     }
   }
 
   @Override
   public void run() {
     while (true) {
-      while (availablePool.size() > connectPoolSize)
+      while (!availablePool.isEmpty()) {
         try {
           availablePool.remove().close();
-          ConsoleLog.println("Closed a SQL connection from pool");
         } catch (SQLException e) {
           ConsoleLog.errorPrint("Fail to close a SQL connection from pool");
           e.printStackTrace();
         }
+      }
+      for (int i = 0; i < connectPoolSize; i++)
+        availablePool.add(createConnection());
       try {
         Thread.sleep(threadSleepTime);
       } catch (InterruptedException e) {

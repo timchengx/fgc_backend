@@ -1,5 +1,8 @@
 package com.fgc.backend;
 
+import java.io.IOException;
+
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.fgc.data.JSON;
@@ -16,26 +19,34 @@ public class AuthenticationSession implements Runnable {
 
   @Override
   public void run() {
+    ConsoleLog.println("System: a user connected");
+    String loginString = null;
     try {
-      String loginString = user.receive();
+      loginString = user.receive();
+      if (loginString == null || loginString.isEmpty()) {
+        ConsoleLog.println("System: a user disconnect in auth.");
+        user.close();
+        return;
+      }
       JSONObject loginJSON = new JSONObject(loginString);
       String token = loginJSON.getString(JSON.KEY_TOKEN);
       String gameID = loginJSON.getString(JSON.KEY_GAMEID);
       String gameName = LoginSQLCheck.login(token, gameID);
-      if(gameName != null) {
+      if (gameName != null) {
         user.setInformation(gameName, gameID);
-        new Thread(new MatchingSession(user, gameID)).start();
+        new Thread(new MatchingSession(user, LoginSQLCheck.fixGameName(gameID))).start();
+        ConsoleLog.gameIDPrint(gameID, gameName + " login!");
       } else {
-         throw new Exception();
+        user.send(JSON.createResultFalse().toString());
+        user.close();
       }
-      
-    } catch (Exception e) {
-      ConsoleLog.errorPrint("Fail to get an user's login information");
-      e.printStackTrace();
+    } catch (IOException e) {
+      ConsoleLog.println("System: IOException in auth.");
+      user.close();
+    } catch (JSONException e) {
+      ConsoleLog.println("System: disconnect a user (JSON data invalid in auth)" + " (" + loginString + ")");
       user.send(JSON.createResultFalse().toString());
       user.close();
-      return;
     }
   }
-
 }

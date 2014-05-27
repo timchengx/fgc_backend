@@ -13,12 +13,18 @@ import com.fgc.tools.ConsoleLog;
 public class MatchingSQLAction {
 
   private static final String SQL_GETLIST = "SELECT id FROM queue WHERE game = ?";
-  private static final String SQL_JOINQUEUE = "INSERT INTO queue(id , game) VALUES (?, ?)";
-  private static final String SQL_QUERYSELF = "SELECT client FROM ? WHERE client = ?";
-  private static final String SQL_QUERYOTHER =
-      "SELECT host, client FROM ? WHERE client = ? OR host = ?";
-  private static final String SQL_WRITE_TO_GAMEQUEUE = "INSERT INTO ?(host, client) VALUES ( ?, ?)";
-  private static final String SQL_DELETE_REQUEST = "DELETE FROM ? WHERE host = ? AND client = ?";
+  private static final String SQL_JOIN_QUEUE = "INSERT INTO queue(id , game) VALUES (?, ?)";
+  private static final String SQL_LEAVE_QUEUE = "DELETE FROM queue WHERE id = ? AND game = ?";
+  private static final String SQL_QUERY_QUEUE = "SELECT id FROM queue WHERE id = ? AND game = ?";
+  private static final String SQL_QUERY_SELF =
+      "SELECT host, client FROM $gameTable WHERE client = ?";
+  private static final String SQL_QUERY_REQUEST =
+      "SELECT host, client FROM $gameTable WHERE client = ? OR host = ?";
+  private static final String SQL_WRITE_REQUEST =
+      "INSERT INTO $gameTable(host, client) VALUES ( ?, ?)";
+  private static final String SQL_DELETE_REQUEST =
+      "DELETE FROM $gameTable WHERE host = ? AND client = ?";
+  private static final String SQL_DELETE_REQUEST_BY_CLIENT = "DELETE FROM $gameTable WHERE client = ?";
   private static final String QUEUE_TABLE = "queue_";
   private static final String COLUMN_HOST = "host";
   /* for unique, random gen from UUID class */
@@ -37,34 +43,35 @@ public class MatchingSQLAction {
 
   public JSONArray getList() {
     String userGameID;
-      Connection dbConnection = Database.getConnection();
-      try {
-        PreparedStatement query = dbConnection.prepareStatement(SQL_GETLIST);
-        query.setString(1, gameID);
-        ResultSet queryResult = query.executeQuery();
-        gameList = new JSONArray();
-        while (queryResult.next()) {
-          userGameID = queryResult.getString(1);
-          gameList.put(JSON.createIDObject(userGameID));
-        }
-      } catch (SQLException e) {
-        ConsoleLog.sqlErrorPrint(SQL_GETLIST, gameID);
-        e.printStackTrace();
-      } finally {
-        Database.returnConnection(dbConnection);
+    Connection dbConnection = Database.getConnection();
+    try {
+      PreparedStatement query = dbConnection.prepareStatement(SQL_GETLIST);
+      query.setString(1, gameID);
+      ResultSet queryResult = query.executeQuery();
+      gameList = new JSONArray();
+      while (queryResult.next()) {
+        userGameID = queryResult.getString(1);
+        gameList.put(JSON.createIDObject(userGameID));
       }
+      ConsoleLog.gameIDPrint(gameID, ": there have " + gameList.length() + " people matching");
+    } catch (SQLException e) {
+      ConsoleLog.sqlErrorPrint(SQL_GETLIST, gameID);
+      e.printStackTrace();
+    } finally {
+      Database.returnConnection(dbConnection);
+    }
     return gameList;
   }
 
   public void joinGame(String userGameID) {
     Connection dbConnection = Database.getConnection();
     try {
-      PreparedStatement query = dbConnection.prepareStatement(SQL_JOINQUEUE);
+      PreparedStatement query = dbConnection.prepareStatement(SQL_JOIN_QUEUE);
       query.setString(1, userGameID);
       query.setString(2, gameID);
       query.executeUpdate();
     } catch (SQLException e) {
-      ConsoleLog.sqlErrorPrint(SQL_JOINQUEUE, userGameID + ", " + gameID);
+      ConsoleLog.sqlErrorPrint(SQL_JOIN_QUEUE, userGameID + ", " + gameID);
       e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
@@ -76,48 +83,84 @@ public class MatchingSQLAction {
     try {
       PreparedStatement query;
       ResultSet queryResult;
-      if(delete) {
-        query = dbConnection.prepareStatement(SQL_DELETE_REQUEST);
-        query.setString(1, gameTableName);
-        query.setString(2, host);
-        query.setString(3, client);
+      String sqlCommand;
+
+      if (client == null) {
+        String result = null;
+        query = dbConnection.prepareStatement(SQL_LEAVE_QUEUE);
+        query.setString(1, host);
+        query.setString(2, gameID);
+        query.executeUpdate();
+        
+        sqlCommand = SQL_QUERY_SELF.replace("$gameTable", gameTableName);
+        query = dbConnection.prepareStatement(sqlCommand);
+        query.setString(1, host);
+        queryResult = query.executeQuery();
+        if (queryResult.first())
+          result = queryResult.getString(COLUMN_HOST);
+        
+        sqlCommand = SQL_DELETE_REQUEST_BY_CLIENT.replace("$gameTable", gameTableName);
+        query = dbConnection.prepareStatement(sqlCommand);
+        query.setString(1, host);
+        query.executeUpdate();
+        
+        return result;
+      }
+
+      else if (delete) {
+        sqlCommand = SQL_DELETE_REQUEST.replace("$gameTable", gameTableName);
+        query = dbConnection.prepareStatement(sqlCommand);
+        query.setString(1, host);
+        query.setString(2, client);
         query.executeUpdate();
         return PUTREQUEST_COMPLETE;
       }
+
       /* check is that you been lock by other player */
-      query = dbConnection.prepareStatement(SQL_QUERYSELF);
-      query.setString(1, gameTableName);
-      query.setString(2, host);
+      sqlCommand = SQL_QUERY_SELF.replace("$gameTable", gameTableName);
+      query = dbConnection.prepareStatement(sqlCommand);
+      query.setString(1, host);
       queryResult = query.executeQuery();
-      if(queryResult.first()) {
-        Database.returnConnection(dbConnection);
+      if (queryResult.first()) {
+        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + " failed. (" + queryResult.getString(COLUMN_HOST) + " send request first!)");
         return queryResult.getString(COLUMN_HOST);
       }
       
+
       /* check the player you want to play with is available or not */
-      query = dbConnection.prepareStatement(SQL_QUERYOTHER);
-      query.setString(1, gameTableName);
-      query.setString(2, client);
-      query.setString(3, host);
+      sqlCommand = SQL_QUERY_REQUEST.replace("$gameTable", gameTableName);
+      query = dbConnection.prepareStatement(sqlCommand);
+      query.setString(1, client);
+      query.setString(2, host);
       queryResult = query.executeQuery();
-      if(queryResult.first()) {
-        Database.returnConnection(dbConnection);
+      if (queryResult.first()) {
+        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + "failed. (not available)");
         return PUTREQUEST_RESULT2;
       }
       
+      query = dbConnection.prepareStatement(SQL_QUERY_QUEUE);
+      query.setString(1, client);
+      query.setString(2, gameID);
+      queryResult = query.executeQuery();
+      if(!queryResult.first()) {
+        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + "failed. (disconnected.)");
+        return PUTREQUEST_RESULT2;
+      }
+
       /* write user request into game queue table */
-      query = dbConnection.prepareStatement(SQL_WRITE_TO_GAMEQUEUE);
-      query.setString(1, gameTableName);
-      query.setString(2, host);
-      query.setString(3, client);
+      sqlCommand = SQL_WRITE_REQUEST.replace("$gameTable", gameTableName);
+      query = dbConnection.prepareStatement(sqlCommand);
+      query.setString(1, host);
+      query.setString(2, client);
       query.executeUpdate();
-      
+
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint("when putRequest in " + gameID);
       e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
+    ConsoleLog.gameIDPrint(gameID, host + " send request to " + client);
     return PUTREQUEST_COMPLETE;
   }
 }
