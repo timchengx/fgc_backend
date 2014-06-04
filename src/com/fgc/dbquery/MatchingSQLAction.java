@@ -53,7 +53,7 @@ public class MatchingSQLAction {
         userGameID = queryResult.getString(1);
         gameList.put(JSON.createIDObject(userGameID));
       }
-      ConsoleLog.gameIDPrint(gameID, ": there have " + gameList.length() + " people matching");
+      ConsoleLog.gameIDPrint(gameID, "there have " + gameList.length() + " people matching");
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_GETLIST, gameID);
       e.printStackTrace();

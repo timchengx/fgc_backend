@@ -8,11 +8,12 @@ import org.json.JSONObject;
 
 import com.fgc.data.GameRoomList;
 import com.fgc.data.JSON;
+import com.fgc.data.MatchingGamesSQL;
 import com.fgc.data.User;
 import com.fgc.data.WaitingReplyUsers;
-import com.fgc.dbquery.MatchingGamesSQL;
 import com.fgc.dbquery.MatchingSQLAction;
 import com.fgc.tools.ConsoleLog;
+import com.fgc.tools.OnePersonCheckDaemon;
 
 public class MatchingSession implements Runnable {
   private User user;
@@ -24,12 +25,16 @@ public class MatchingSession implements Runnable {
   public static long SLEEPTIME = 10000;
   private MatchingSQLAction sqlData;
   private boolean isFirstRun;
+  private boolean isDisconnect;
+  private OnePersonCheckDaemon daemon;
 
 
   public MatchingSession(User client, String id) {
     user = client;
     gameID = id;
     isFirstRun = true;
+    isDisconnect = false;
+    daemon = null;
   }
 
   @Override
@@ -52,6 +57,16 @@ public class MatchingSession implements Runnable {
       while (arrayJSON.length() == 0) {
         listJSON.put(JSON.KEY_LIST, JSONObject.NULL);
         user.send(listJSON.toString());
+        if (daemon == null) {
+          daemon = new OnePersonCheckDaemon(this, user);
+          new Thread(daemon).start();
+        }
+        if (isDisconnect) {
+          dataCorrupt();
+          sqlData.putRequest(user.getUserGameName(), null, true);
+          return;
+        }
+
         try {
           Thread.sleep(SLEEPTIME);
         } catch (InterruptedException e) {
@@ -63,7 +78,12 @@ public class MatchingSession implements Runnable {
       }
 
       listJSON.put(JSON.KEY_LIST, arrayJSON);
-      sendReceive();
+      user.send(listJSON.toString());
+
+      if (daemon == null)
+        receive();
+      else
+        daemon = null;
 
       try {
         getInviteID();
@@ -88,7 +108,8 @@ public class MatchingSession implements Runnable {
       } else if (!result.equals(MatchingSQLAction.PUTREQUEST_COMPLETE)) {
         listJSON = JSON.createResultObject(1);
         listJSON.put(JSON.KEY_ID, result);
-        sendReceive();
+        user.send(listJSON.toString());
+        receive();
         try {
           acceptOrNot = isAccept();
         } catch (JSONException e) {
@@ -119,8 +140,8 @@ public class MatchingSession implements Runnable {
     }
   }
 
-  private void sendReceive() {
-    user.send(listJSON.toString());
+  private void receive() {
+    //user.send(listJSON.toString());
     try {
       userReply = user.receive();
     } catch (IOException e) {
@@ -135,7 +156,8 @@ public class MatchingSession implements Runnable {
       user.send(JSON.createResultObject(0).toString());
       GameRoomList.putRoom(user.getUserGameName(), new GameRoomSession(user));
     } else {
-      ConsoleLog.gameIDPrint(gameID, user.getUserGameName() + " send invite to " + getInviteID() + " rejected.");
+      ConsoleLog.gameIDPrint(gameID, user.getUserGameName() + " send invite to " + getInviteID()
+          + " rejected.");
       sqlData.putRequest(user.getUserGameName(), getInviteID(), true);
       new Thread(this).start();
     }
@@ -163,14 +185,20 @@ public class MatchingSession implements Runnable {
   }
 
   private void dataCorrupt() {
-    ConsoleLog.errorPrint(gameID + ": " + user.getUserGameName() + " disconnect. JSON data corrupt. ("
-        + userReply + ")");
+    ConsoleLog.errorPrint(gameID + ": " + user.getUserGameName()
+        + " disconnect. JSON data corrupt. (" + userReply + ")");
     user.send(JSON.createResultFalse().toString());
     user.close();
   }
 
   public static void setSleepTime(long time) {
     SLEEPTIME = time;
+  }
+
+  public void notifyResult(boolean result, String data) {
+    if (result)
+      isDisconnect = true;
+    userReply = data;
   }
 
 }

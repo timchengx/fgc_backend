@@ -1,6 +1,8 @@
-package com.fgc.dbquery;
+package com.fgc.data;
 
 import java.util.HashMap;
+
+import com.fgc.dbquery.MatchingSQLAction;
 
 public class MatchingGamesSQL {
   private static HashMap<String, MatchingSQLAction> list;

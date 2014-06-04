@@ -7,12 +7,13 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 
 import com.fgc.tools.ConsoleLog;
+import com.fgc.tools.LoginFailException;
 
 public class LoginSQLCheck {
   private static final String SQL_TOKEN = "SELECT token, tokenDeadline FROM user WHERE token = ?;";
   private static final String SQL_GAMEID = "SELECT COUNT(*) FROM game WHERE game = ?;";
   private static final String SQL_GETGAMENAME =
-      "SELECT id FROM user JOIN avatar ON user.username = avatar.username WHERE token = ?";
+      "SELECT id FROM user JOIN avatar ON user.username = avatar.username WHERE token = ? AND game = ?";
   private static final String SQL_GETGAMEID = "SELECT game FROM game WHERE game = ?";
   private static final String SQL_DELETE_TOKEN = "UPDATE user SET token = NULL , tokenDeadline = NULL WHERE token = ?";
   private static final String COLUMN_VALIDTIME = "tokenDeadline";
@@ -42,11 +43,14 @@ public class LoginSQLCheck {
 
         query = dbConnection.prepareStatement(SQL_GETGAMENAME);
         query.setString(1, token);
+        query.setString(2, gameID);
         queryResult = query.executeQuery();
         if (queryResult.next())
           gameName = queryResult.getString(COLUMN_ID);
         else
           throw new LoginFailException("user didn't have game account");
+        
+        //加上多重登入檢查！
         
         query = dbConnection.prepareStatement(SQL_DELETE_TOKEN);
         query.setString(1, token);

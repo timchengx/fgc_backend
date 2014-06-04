@@ -86,9 +86,12 @@ public class GamingSQLAction {
       query.setInt(1, rid);
       ResultSet queryResult = query.executeQuery();
       if(queryResult.first())
-        oldData = "" + queryResult.getString(COLUMN_RECORD);
+        oldData = queryResult.getString(COLUMN_RECORD);
       query = dbConnection.prepareStatement(SQL_ADD_RECORD);
-      query.setString(1, oldData + "\n" + data);
+      if(oldData == null || oldData.isEmpty())
+        query.setString(1, data);
+      else
+        query.setString(1, oldData + "\n" + data);
       query.setInt(2, rid);
       query.executeUpdate();
       //query.get
