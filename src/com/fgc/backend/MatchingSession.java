@@ -26,7 +26,7 @@ public class MatchingSession implements Runnable {
   private MatchingSQLAction sqlData;
   private boolean isFirstRun;
   private boolean isDisconnect;
-  private OnePersonCheckDaemon daemon;
+  private Thread daemon;
 
 
   public MatchingSession(User client, String id) {
@@ -58,10 +58,11 @@ public class MatchingSession implements Runnable {
         listJSON.put(JSON.KEY_LIST, JSONObject.NULL);
         user.send(listJSON.toString());
         if (daemon == null) {
-          daemon = new OnePersonCheckDaemon(this, user);
-          new Thread(daemon).start();
+          daemon = new Thread(new OnePersonCheckDaemon(this, user));
+          daemon.start();
         }
         if (isDisconnect) {
+          System.out.println("no body but disconnect");
           dataCorrupt();
           sqlData.putRequest(user.getUserGameName(), null, true);
           return;
@@ -80,10 +81,13 @@ public class MatchingSession implements Runnable {
       listJSON.put(JSON.KEY_LIST, arrayJSON);
       user.send(listJSON.toString());
 
-      if (daemon == null)
+      if (daemon == null) {
         receive();
-      else
+      }
+      else {
+        while(daemon.isAlive());
         daemon = null;
+      }
 
       try {
         getInviteID();
