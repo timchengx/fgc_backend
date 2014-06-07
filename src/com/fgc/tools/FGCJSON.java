@@ -1,8 +1,8 @@
-package com.fgc.data;
+package com.fgc.tools;
 
 import org.json.JSONObject;
 
-public class JSON {
+public class FGCJSON {
   public static final String KEY_TOKEN = "token";
   public static final String KEY_GAMEID = "gameID";
   public static final String KEY_RESULT = "result";
@@ -34,7 +34,7 @@ public class JSON {
   }
   public static JSONObject createResultObject(int resultID) {
     JSONObject json = new JSONObject();
-    json.put(JSON.KEY_RESULTID, resultID);
+    json.put(FGCJSON.KEY_RESULTID, resultID);
     return json;
   }
   

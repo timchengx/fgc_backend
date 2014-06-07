@@ -7,10 +7,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.fgc.data.GameRoomList;
-import com.fgc.data.JSON;
 import com.fgc.data.User;
 import com.fgc.dbquery.GamingSQLAction;
 import com.fgc.tools.ConsoleLog;
+import com.fgc.tools.FGCJSON;
 
 public class GameRoomSession implements Runnable {
   private static Random dice = new Random();
@@ -57,11 +57,11 @@ public class GameRoomSession implements Runnable {
         disconnect(FIRST_USER);
         break;
       }
-      if (firstUserData.has(JSON.KEY_WINNER)) {
+      if (firstUserData.has(FGCJSON.KEY_WINNER)) {
         gameFinish(true);
         break;
       }
-      if (firstUserData.has(JSON.KEY_PUTITTHERE) && firstUserData.getBoolean(JSON.KEY_PUTITTHERE)) {
+      if (firstUserData.has(FGCJSON.KEY_PUTITTHERE) && firstUserData.getBoolean(FGCJSON.KEY_PUTITTHERE)) {
         writeToSQL(firstUserData);
       }
 
@@ -76,12 +76,12 @@ public class GameRoomSession implements Runnable {
         disconnect(SECOND_USER);
         break;
       }
-      if (secondUserData.has(JSON.KEY_WINNER)) {
+      if (secondUserData.has(FGCJSON.KEY_WINNER)) {
         gameFinish(false);
         break;
       }
-      if (secondUserData.has(JSON.KEY_PUTITTHERE) && secondUserData.getBoolean(JSON.KEY_PUTITTHERE)) {
-        writeToSQL(firstUserData);
+      if (secondUserData.has(FGCJSON.KEY_PUTITTHERE) && secondUserData.getBoolean(FGCJSON.KEY_PUTITTHERE)) {
+        writeToSQL(secondUserData);
       }
 
       gameMessagePrint(secondUser.getUserGameName() + " send " + secondUserData.toString());
@@ -92,7 +92,7 @@ public class GameRoomSession implements Runnable {
   }
 
   private void writeToSQL(JSONObject data) {
-    GamingSQLAction.appendGameRecord(sqlRoomID, data.getString(JSON.KEY_DATA));
+    GamingSQLAction.appendGameRecord(sqlRoomID, data.getString(FGCJSON.KEY_DATA));
   }
 
   private void gameFinish(boolean isFirstUserSend) {
@@ -100,26 +100,26 @@ public class GameRoomSession implements Runnable {
     if (isFirstUserSend) {
       gameMessagePrint("receive " + firstUser.getUserGameName() + " end game message("
           + firstUserData.toString() + ")");
-      winner = firstUserData.getString(JSON.KEY_WINNER);
-      firstUser.send(JSON.createResultTrue().toString());
+      winner = firstUserData.getString(FGCJSON.KEY_WINNER);
+      firstUser.send(FGCJSON.createResultTrue().toString());
       firstUser.close();
     } else {
       gameMessagePrint("receive " + secondUser.getUserGameName() + " end game message("
           + secondUserData.toString() + ")");
-      winner = secondUserData.getString(JSON.KEY_WINNER);
-      secondUser.send(JSON.createResultTrue().toString());
+      winner = secondUserData.getString(FGCJSON.KEY_WINNER);
+      secondUser.send(FGCJSON.createResultTrue().toString());
       secondUser.close();
     }
     // wait another user send finish...
     if (isFirstUserSend) {
       try {
         secondUserReceive();
-        secondUser.send(JSON.createResultTrue().toString());
+        secondUser.send(FGCJSON.createResultTrue().toString());
         secondUser.close();
         gameMessagePrint("receive " + secondUser.getUserGameName() + " end game message("
             + secondUserData.toString() + ")");
-        if (secondUserData.has(JSON.KEY_WINNER)
-            && winner.equals(secondUserData.getString(JSON.KEY_WINNER))) {
+        if (secondUserData.has(FGCJSON.KEY_WINNER)
+            && winner.equals(secondUserData.getString(FGCJSON.KEY_WINNER))) {
 
           GamingSQLAction.setUserGameStats(gameID, winner, true);
           if (winner.equals(firstUser.getUserGameName()))
@@ -137,7 +137,7 @@ public class GameRoomSession implements Runnable {
     } else { // (!isFirstUserSend)
       try {
         firstUserReceive();
-        firstUser.send(JSON.createResultTrue().toString());
+        firstUser.send(FGCJSON.createResultTrue().toString());
         firstUser.close();
         gameMessagePrint("receive " + firstUser.getUserGameName() + " end game message("
             + firstUserData.toString() + ")");
@@ -145,8 +145,8 @@ public class GameRoomSession implements Runnable {
         ConsoleLog.errorPrint(firstUser.getUserGameName() + "in game " + gameID
             + "disconnect without send winner message");
       }
-      if (secondUserData.has(JSON.KEY_WINNER)
-          && winner.equals(firstUserData.getString(JSON.KEY_WINNER))) {
+      if (secondUserData.has(FGCJSON.KEY_WINNER)
+          && winner.equals(firstUserData.getString(FGCJSON.KEY_WINNER))) {
 
         GamingSQLAction.setUserGameStats(gameID, winner, true);
         if (winner.equals(firstUser.getUserGameName()))
@@ -164,12 +164,12 @@ public class GameRoomSession implements Runnable {
     JSONObject passData;
     firstUserFirst = dice.nextBoolean();
 
-    passData = JSON.createIDObject(secondUser.getUserGameName());
-    passData.put(JSON.KEY_WHOFIRST, firstUserFirst);
+    passData = FGCJSON.createIDObject(secondUser.getUserGameName());
+    passData.put(FGCJSON.KEY_WHOFIRST, firstUserFirst);
     firstUser.send(passData.toString());
 
-    passData = JSON.createIDObject(firstUser.getUserGameName());
-    passData.put(JSON.KEY_WHOFIRST, !firstUserFirst);
+    passData = FGCJSON.createIDObject(firstUser.getUserGameName());
+    passData.put(FGCJSON.KEY_WHOFIRST, !firstUserFirst);
     secondUser.send(passData.toString());
 
   }
@@ -205,7 +205,7 @@ public class GameRoomSession implements Runnable {
   }
 
   private void disconnect(boolean isFirstUser) {
-    JSONObject finalResult = JSON.createResultTrue();
+    JSONObject finalResult = FGCJSON.createResultTrue();
     if (isFirstUser) {
       gameMessagePrint(firstUser.getUserGameName() + " disconnect without finish game.");
       firstUser.close();

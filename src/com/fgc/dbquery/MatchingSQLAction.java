@@ -7,8 +7,8 @@ import java.sql.SQLException;
 
 import org.json.JSONArray;
 
-import com.fgc.data.JSON;
 import com.fgc.tools.ConsoleLog;
+import com.fgc.tools.FGCJSON;
 
 public class MatchingSQLAction {
 
@@ -51,7 +51,7 @@ public class MatchingSQLAction {
       gameList = new JSONArray();
       while (queryResult.next()) {
         userGameID = queryResult.getString(1);
-        gameList.put(JSON.createIDObject(userGameID));
+        gameList.put(FGCJSON.createIDObject(userGameID));
       }
       ConsoleLog.gameIDPrint(gameID, "there have " + gameList.length() + " people matching");
     } catch (SQLException e) {

@@ -5,10 +5,10 @@ import java.io.IOException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.fgc.data.JSON;
 import com.fgc.data.User;
 import com.fgc.dbquery.LoginSQLCheck;
 import com.fgc.tools.ConsoleLog;
+import com.fgc.tools.FGCJSON;
 
 public class AuthenticationSession implements Runnable {
   private User user;
@@ -29,15 +29,15 @@ public class AuthenticationSession implements Runnable {
         return;
       }
       JSONObject loginJSON = new JSONObject(loginString);
-      String token = loginJSON.getString(JSON.KEY_TOKEN);
-      String gameID = loginJSON.getString(JSON.KEY_GAMEID);
+      String token = loginJSON.getString(FGCJSON.KEY_TOKEN);
+      String gameID = loginJSON.getString(FGCJSON.KEY_GAMEID);
       String gameName = LoginSQLCheck.login(token, gameID);
       if (gameName != null) {
         user.setInformation(gameName, gameID);
         new Thread(new MatchingSession(user, LoginSQLCheck.fixGameName(gameID))).start();
         ConsoleLog.gameIDPrint(gameID, gameName + " login!");
       } else {
-        user.send(JSON.createResultFalse().toString());
+        user.send(FGCJSON.createResultFalse().toString());
         user.close();
       }
     } catch (IOException e) {
@@ -45,7 +45,7 @@ public class AuthenticationSession implements Runnable {
       user.close();
     } catch (JSONException e) {
       ConsoleLog.println("System: disconnect a user (JSON data invalid in auth)" + " (" + loginString + ")");
-      user.send(JSON.createResultFalse().toString());
+      user.send(FGCJSON.createResultFalse().toString());
       user.close();
     }
   }
