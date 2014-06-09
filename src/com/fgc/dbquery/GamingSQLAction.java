@@ -9,7 +9,9 @@ import java.util.Date;
 
 import com.fgc.tools.ConsoleLog;
 
-
+/* 
+ * this part handles the game step data save to database for online viewer 
+ */
 public class GamingSQLAction {
   private static String SQL_REMOVE_QUEUE = "DELETE FROM queue WHERE id = ? AND game = ?";
   private static String SQL_CREATE_RECORD =
@@ -35,6 +37,7 @@ public class GamingSQLAction {
   private static String REPLACE_TABLE = "$tableName";
   private static String REPLACE_COLUMN = "$columnName";
 
+  /* invoke when game is started, no longer accept other's invite */
   public static void removeFromQueue(String gameID, String userID) {
     Connection dbConnection = Database.getConnection();
     try {
@@ -50,18 +53,25 @@ public class GamingSQLAction {
     }
   }
 
+  /* 
+   * create game step data save entry
+   * firstPlay stand for player who take's first lead
+   * secondPlay stand for player who make the move after first player
+   */
   public static int createGameRecord(String gameID, String firstPlay, String secondPlay) {
     Connection dbConnection = Database.getConnection();
     int rid = -1;
     try {
+      
+      /* create game record */
       PreparedStatement query =
           dbConnection.prepareStatement(SQL_CREATE_RECORD);
-
       query.setString(1, gameID);
       query.setString(2, firstPlay);
       query.setString(3, secondPlay);
       query.executeUpdate();
       
+      /* lookup room id that correspond to the game record we just create before */
       query = dbConnection.prepareStatement(SQL_FIND_RID);
       query.setString(1, firstPlay);
       query.setString(2, secondPlay);
@@ -77,24 +87,25 @@ public class GamingSQLAction {
     }
     return rid;
   }
-
+  /* invoke when game room make a new step data, write to SQL */
   public static void appendGameRecord(int rid, String data) {
     Connection dbConnection = Database.getConnection();
     String oldData = "";
     try {
+      /* take out previous data first */
       PreparedStatement query = dbConnection.prepareStatement(SQL_QUERY_RECORD);
       query.setInt(1, rid);
       ResultSet queryResult = query.executeQuery();
       if(queryResult.first())
         oldData = queryResult.getString(COLUMN_RECORD);
+      /* write to same entry, using append way to add it */
       query = dbConnection.prepareStatement(SQL_ADD_RECORD);
-      if(oldData == null || oldData.isEmpty())
+      if(oldData == null || oldData.isEmpty())  // if this is a brand new write
         query.setString(1, data);
       else
         query.setString(1, oldData + "\n" + data);
       query.setInt(2, rid);
       query.executeUpdate();
-      //query.get
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_ADD_RECORD, data + ", " + rid);
       e.printStackTrace();
@@ -103,10 +114,12 @@ public class GamingSQLAction {
     }
   }
 
+  /* invoke when game is finish, write end time to SQL entry */
   public static void finishGame(int rid) {
     Connection dbConnection = Database.getConnection();
-    Timestamp time = new Timestamp(new Date().getTime());
+    Timestamp time = new Timestamp(new Date().getTime());   // get current time
     try {
+      /* write end time to entiry */
       PreparedStatement query = dbConnection.prepareStatement(SQL_END_RECORD);
       query.setTimestamp(1, time);
       query.setInt(2, rid);
@@ -119,6 +132,11 @@ public class GamingSQLAction {
     }
   }
 
+  /* 
+   * remove matching entries from gamequeue, invoke when game is finish
+   * (the reason of remove in finsh is because 2 player can't be invited before
+   * they finish game)
+   */
   public static void removeFromGameQueue(String gameID, String host, String client) {
     Connection dbConnection = Database.getConnection();
     try {
@@ -136,6 +154,7 @@ public class GamingSQLAction {
     }
   }
 
+  /* add player's play count of correspond game */
   public static void addGameCount(String gameID, String userID) {
     Connection dbConnection = Database.getConnection();
     PreparedStatement query;
@@ -144,6 +163,7 @@ public class GamingSQLAction {
     int time;
 
     try {
+      /* lookup current play count first */
       sqlCommand = SQL_QUERY_GAME_COLUMN.replace(REPLACE_COLUMN, COLUMN_TIME);
       query = dbConnection.prepareStatement(sqlCommand);
       query.setString(1, userID);
@@ -151,7 +171,8 @@ public class GamingSQLAction {
       queryResult = query.executeQuery();
       if (queryResult.first()) {
         time = queryResult.getInt(COLUMN_TIME);
-        time++;
+        time++; // add play count
+        /* write new play count to database */
         sqlCommand = SQL_UPDATE_GAME_COLUMN.replace(REPLACE_COLUMN, COLUMN_TIME);
         query = dbConnection.prepareStatement(sqlCommand);
         query.setInt(1, time);
@@ -168,6 +189,7 @@ public class GamingSQLAction {
 
   }
 
+  /* set player's match result by correspond game, win or lose */
   public static void setUserGameStats(String gameID, String userID, boolean win) {
     Connection dbConnection = Database.getConnection();
     PreparedStatement query;
@@ -176,12 +198,14 @@ public class GamingSQLAction {
     String changeColumn;
     String sqlCommand;
 
+    /* determine which column should lookup and update(win or lost) */
     if (win)
       changeColumn = COLUMN_WIN;
     else
       changeColumn = COLUMN_LOSE;
 
     try {
+      /* lookup correspond column's value first */
       sqlCommand = SQL_QUERY_GAME_COLUMN.replace(REPLACE_COLUMN, changeColumn);
       query = dbConnection.prepareStatement(sqlCommand);
       query.setString(1, userID);
@@ -189,7 +213,8 @@ public class GamingSQLAction {
       queryResult = query.executeQuery();
       if (queryResult.first()) {
         time = queryResult.getInt(changeColumn);
-        time++;
+        time++; // add win or lost count
+        /* write new value to database */
         sqlCommand = SQL_UPDATE_GAME_COLUMN.replace(REPLACE_COLUMN, changeColumn);
         query = dbConnection.prepareStatement(sqlCommand);
         query.setInt(1, time);

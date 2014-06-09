@@ -4,6 +4,8 @@ import java.util.HashMap;
 
 import com.fgc.backend.GameRoomSession;
 
+/* this is a map for saving all game room that current playing */
+
 public class GameRoomList {
   private static HashMap<String, GameRoomSession> table;
   static {

@@ -16,19 +16,28 @@ import com.fgc.tools.FGCJSON;
 import com.fgc.tools.OnePersonCheckDaemon;
 
 public class MatchingSession implements Runnable {
+  public static long SLEEPTIME = 3000;
   private User user;
   private String gameID;
   private String userReply;
+  
   private JSONObject listJSON;
   private JSONArray arrayJSON;
   private JSONObject replyJSON;
-  public static long SLEEPTIME = 3000;
+  
   private MatchingSQLAction sqlData;
-  private boolean isFirstRun;
-  private boolean isDisconnect;
-  private Thread daemon;
+  
+  private boolean isFirstRun;   // is this thread been restart or is first run
+  private boolean isDisconnect; // determine is user disconnect or not
+  
+  /*
+   * if when user login, there is no player can player with,
+   * this thread start for check is user disconnect on this state
+   * (check by listen socket receive, if receive return null, means disconnect)
+   */
+  private Thread daemon;    
 
-
+  /* constructor */
   public MatchingSession(User client, String id) {
     user = client;
     gameID = id;
@@ -42,21 +51,31 @@ public class MatchingSession implements Runnable {
     String result;
     boolean acceptOrNot;
 
+    /* 
+     * if this session is first start, initialize SQL connect object
+     * create JSON and write SQL to show that a user is login
+     */
     if (isFirstRun) {
       sqlData = MatchingGamesSQL.getMatchingList(gameID);
       listJSON = FGCJSON.createResultTrue();
       sqlData.joinGame(user.getUserGameName());
       isFirstRun = false;
-    } else
+    } else  // if this session is been restart, means that invite request fail
       listJSON = FGCJSON.createResultObject(2);
 
     while (true) {
+      /* get matching list and remove self in list */
       arrayJSON = sqlData.getList();
       removeSelfInJSON();
 
+      /* 
+       * if no one can match
+       * send null list to client and wait next query
+       */
       while (arrayJSON.length() == 0) {
         listJSON.put(FGCJSON.KEY_LIST, JSONObject.NULL);
         user.send(listJSON.toString());
+        /* the daemon to determine is user disconnect in this state */
         if (daemon == null) {
           daemon = new Thread(new OnePersonCheckDaemon(this, user));
           daemon.start();
@@ -72,14 +91,17 @@ public class MatchingSession implements Runnable {
         } catch (InterruptedException e) {
           ConsoleLog.errorPrint(gameID + ": a thread sleep fail(" + user.getUserGameName() + ")");
         }
+        /* after sleep query list again */
         arrayJSON = sqlData.getList();
         removeSelfInJSON();
         listJSON.remove(FGCJSON.KEY_LIST);
       }
 
+      /* send list to user */
       listJSON.put(FGCJSON.KEY_LIST, arrayJSON);
       user.send(listJSON.toString());
 
+      /* receive user's reply */
       if (daemon == null) {
         receive();
       } else {
@@ -88,8 +110,13 @@ public class MatchingSession implements Runnable {
       }
 
       try {
-        getInviteID();
-      } catch (JSONException e) {
+        getInviteID();  //extract invite id
+      } 
+      /* 
+       * if json data can't be determine, clean all request that this user
+       * has send and notify other user request decline
+       */
+        catch (JSONException e) {
         result = sqlData.putRequest(user.getUserGameName(), null, true);
         if (result != null)
           WaitingReplyUsers.getUser(result).receiveInviteReply(false);
@@ -102,19 +129,26 @@ public class MatchingSession implements Runnable {
         dataCorrupt("json null");
         return;
       }
-
+      /* write request to database and get resut */
       result = sqlData.putRequest(user.getUserGameName(), getInviteID(), false);
 
+      /* if result2, re choice the player */
       if (result.equals(MatchingSQLAction.PUTREQUEST_RESULT2)) {
         listJSON = FGCJSON.createResultObject(2);
+      /* if result1, send id to client and wait receive */
       } else if (!result.equals(MatchingSQLAction.PUTREQUEST_COMPLETE)) {
         listJSON = FGCJSON.createResultObject(1);
         listJSON.put(FGCJSON.KEY_ID, result);
         user.send(listJSON.toString());
         receive();
         try {
-          acceptOrNot = isAccept();
+          acceptOrNot = isAccept(); // get user's reply (accept or not)
+          /* 
+           * if json data can't be determine, clean all request that this user
+           * has send and notify other user request decline
+           */
         } catch (JSONException e) {
+          
           WaitingReplyUsers.getUser(result).receiveInviteReply(false);
           sqlData.putRequest(user.getUserGameName(), null, true);
           dataCorrupt("in result1 json format error");
@@ -125,10 +159,16 @@ public class MatchingSession implements Runnable {
           dataCorrupt("in result1 data null");
           return;
         }
+        /* notify another user invite result */
         WaitingReplyUsers.getUser(result).receiveInviteReply(acceptOrNot);
+        /* if decline, send result2 to client */
         if (!acceptOrNot)
           listJSON = FGCJSON.createResultObject(2);
-        else {
+        else { 
+          /* 
+           * if accept, get room that been create by other player 
+           * join the room and start gameroom session
+           */
           user.send(FGCJSON.createResultObject(0).toString());
           GameRoomSession room = GameRoomList.getRoom(result);
           room.joinRoom(user);
@@ -136,14 +176,15 @@ public class MatchingSession implements Runnable {
           break;
         }
       } else {
+        /* if send request complete, end thread and wait other player's reply */
         WaitingReplyUsers.putWaiting(user.getUserGameName(), this);
         break;
       }
     }
   }
 
+  /* receive user's data */
   private void receive() {
-    // user.send(listJSON.toString());
     try {
       userReply = user.receive();
     } catch (IOException e) {
@@ -152,12 +193,17 @@ public class MatchingSession implements Runnable {
     }
   }
 
+  /* 
+   * if this session previously send invite to other user
+   * this method will be invoked to handle invite result
+   */
   public void receiveInviteReply(boolean result) {
     WaitingReplyUsers.remove(user.getUserGameName());
+    /* if other player accept the request, user go to gameroom session */
     if (result) {
       user.send(FGCJSON.createResultObject(0).toString());
       GameRoomList.putRoom(user.getUserGameName(), new GameRoomSession(user));
-    } else {
+    } else {    // if other player reject the request, restart matching session thread
       ConsoleLog.gameIDPrint(gameID, user.getUserGameName() + " send invite to " + getInviteID()
           + " rejected.");
       sqlData.putRequest(user.getUserGameName(), getInviteID(), true);
@@ -165,16 +211,22 @@ public class MatchingSession implements Runnable {
     }
   }
 
+  /* get user's invite data from json */
   private String getInviteID() throws JSONException {
     replyJSON = new JSONObject(userReply);
     return replyJSON.getString(FGCJSON.KEY_INVITE);
   }
 
+  /* get user's result1 accept boolean result */
   private boolean isAccept() throws JSONException {
     replyJSON = new JSONObject(userReply);
     return replyJSON.getBoolean(FGCJSON.KEY_ACCEPT);
   }
 
+  /* 
+   * the matching list get from database will contain self in it
+   * so remove self from json before send to client
+   */
   private void removeSelfInJSON() {
     if (arrayJSON.length() != 0) {
       for (int i = 0; i < arrayJSON.length(); i++) {
@@ -186,6 +238,7 @@ public class MatchingSession implements Runnable {
     }
   }
 
+  /* invoke when received data from user can't be determine */
   private void dataCorrupt(String message) {
     ConsoleLog.errorPrint(gameID + ": (" + message + ") " + user.getUserGameName()
         + " disconnect. data corrupt. (" + userReply + ")");
@@ -193,10 +246,16 @@ public class MatchingSession implements Runnable {
     user.close();
   }
 
+  /* set query matching list interval time */
   public static void setSleepTime(long time) {
     SLEEPTIME = time;
   }
 
+  /* 
+   * when in no player waiting stage
+   * if socket has send something this method will be invoke
+   * to save the data
+   */
   public void notifyResult(boolean result, String data) {
     if (result)
       isDisconnect = true;

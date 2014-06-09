@@ -12,6 +12,7 @@ import com.fgc.dbquery.GamingSQLAction;
 import com.fgc.tools.ConsoleLog;
 import com.fgc.tools.FGCJSON;
 
+/* this class handles the game playing session */
 public class GameRoomSession implements Runnable {
   private static Random dice = new Random();
   private User firstUser;
@@ -24,6 +25,7 @@ public class GameRoomSession implements Runnable {
   private static final boolean FIRST_USER = true;
   private static final boolean SECOND_USER = false;
 
+  /* constructor */
   public GameRoomSession(User first) {
     firstUser = first;
     gameID = first.getGameID();
@@ -35,21 +37,23 @@ public class GameRoomSession implements Runnable {
 
   @Override
   public void run() {
+    /* initialize and send whofirst to players */
     initialize();
     sendWhoFirst();
 
+    /* if is not firstUser make the first step, receive second user's data before enter loop */
     if (!firstUserFirst) {
       try {
-        secondUserReceive();
-      } catch (IOException e) {
+        secondUserReceive();    //receive data
+      } catch (IOException e) { // disconnect if receive data occur error
         disconnect(SECOND_USER);
         return;
       }
       gameMessagePrint(secondUser.getUserGameName() + " send " + secondUserData.toString());
-      firstUser.send(secondUserData.toString());
+      firstUser.send(secondUserData.toString());    // pass second user's data to first user
     }
 
-
+    /* send and receive loop, exit when game has result */
     while (true) {
       try {
         firstUserReceive();
@@ -57,7 +61,7 @@ public class GameRoomSession implements Runnable {
         disconnect(FIRST_USER);
         break;
       }
-      if (firstUserData.has(FGCJSON.KEY_WINNER)) {
+      if (firstUserData.has(FGCJSON.KEY_WINNER)) {  // game has result
         gameFinish(true);
         break;
       }
@@ -76,7 +80,7 @@ public class GameRoomSession implements Runnable {
         disconnect(SECOND_USER);
         break;
       }
-      if (secondUserData.has(FGCJSON.KEY_WINNER)) {
+      if (secondUserData.has(FGCJSON.KEY_WINNER)) { // game has result
         gameFinish(false);
         break;
       }
@@ -91,12 +95,15 @@ public class GameRoomSession implements Runnable {
 
   }
 
+  /* write step data to database */
   private void writeToSQL(JSONObject data) {
     GamingSQLAction.appendGameRecord(sqlRoomID, data.getString(FGCJSON.KEY_DATA));
   }
 
+  /* invoke when one of player send {"winner":(id)} */
   private void gameFinish(boolean isFirstUserSend) {
     String winner;
+    /* when receive winner data, send {"result":true} to them and disconnect */
     if (isFirstUserSend) {
       gameMessagePrint("receive " + firstUser.getUserGameName() + " end game message("
           + firstUserData.toString() + ")");
@@ -118,6 +125,8 @@ public class GameRoomSession implements Runnable {
         secondUser.close();
         gameMessagePrint("receive " + secondUser.getUserGameName() + " end game message("
             + secondUserData.toString() + ")");
+        
+        /* if both winner id is equal, update both player's win/lost count */
         if (secondUserData.has(FGCJSON.KEY_WINNER)
             && winner.equals(secondUserData.getString(FGCJSON.KEY_WINNER))) {
 
@@ -127,7 +136,7 @@ public class GameRoomSession implements Runnable {
           else
             GamingSQLAction.setUserGameStats(gameID, firstUser.getUserGameName(), false);
         } else {
-          // error... do nothing
+          // if not or error occur... do nothing
         }
       } catch (IOException e) {
         ConsoleLog.errorPrint(secondUser.getUserGameName() + "in game " + gameID
@@ -145,6 +154,7 @@ public class GameRoomSession implements Runnable {
         ConsoleLog.errorPrint(firstUser.getUserGameName() + "in game " + gameID
             + "disconnect without send winner message");
       }
+      /* if both winner id is equal, update both player's win/lost count */
       if (secondUserData.has(FGCJSON.KEY_WINNER)
           && winner.equals(firstUserData.getString(FGCJSON.KEY_WINNER))) {
 
@@ -154,16 +164,16 @@ public class GameRoomSession implements Runnable {
         else
           GamingSQLAction.setUserGameStats(gameID, firstUser.getUserGameName(), false);
       } else {
-        // error... do nothing
+        // if not or error occur... do nothing
       }
     }
     closeRoom();
   }
 
+  /* send other player's id and players who first sequence  to both */
   private void sendWhoFirst() {
     JSONObject passData;
-    firstUserFirst = dice.nextBoolean();
-
+    
     passData = FGCJSON.createIDObject(secondUser.getUserGameName());
     passData.put(FGCJSON.KEY_WHOFIRST, firstUserFirst);
     firstUser.send(passData.toString());
@@ -200,10 +210,7 @@ public class GameRoomSession implements Runnable {
 
   }
 
-  private void closeRoom() {
-    remoteRoomFromGameRooms();
-  }
-
+  /* invoke when someone unexpected disconnect */
   private void disconnect(boolean isFirstUser) {
     JSONObject finalResult = FGCJSON.createResultTrue();
     if (isFirstUser) {
@@ -217,16 +224,18 @@ public class GameRoomSession implements Runnable {
       firstUser.send(finalResult.toString());
       firstUser.close();
     }
-    remoteRoomFromGameRooms();
+    closeRoom();
   }
 
-  private void remoteRoomFromGameRooms() {
+  /* remove this session from list and clean game queue and room */
+  private void closeRoom() {
     GameRoomList.removeRoom(firstUser.getUserGameName());
     GamingSQLAction.removeFromGameQueue(gameID, firstUser.getUserGameName(),
         secondUser.getUserGameName());
     GamingSQLAction.finishGame(sqlRoomID);
   }
 
+  /* print player's move in console */
   private void gameMessagePrint(String message) {
     if (firstUserFirst)
       ConsoleLog.gameIDPrint(gameID,
@@ -238,16 +247,19 @@ public class GameRoomSession implements Runnable {
               + sqlRoomID + ") " + message);
   }
 
+  /* initialze process */
   private void initialize() {
     String firstPlayUserName;
     String secondPlayUserName;
-
+    firstUserFirst = dice.nextBoolean();    // determine who make the first move
+    
+    /* remove both player from game queue and add play game count */
     GamingSQLAction.removeFromQueue(gameID, firstUser.getUserGameName());
     GamingSQLAction.removeFromQueue(gameID, secondUser.getUserGameName());
     GamingSQLAction.addGameCount(gameID, firstUser.getUserGameName());
     GamingSQLAction.addGameCount(gameID, secondUser.getUserGameName());
 
-
+    /* set game record first and second player by who make the first move */
     if (!firstUserFirst) {
       firstPlayUserName = secondUser.getUserGameName();
       secondPlayUserName = firstUser.getUserGameName();
@@ -255,7 +267,7 @@ public class GameRoomSession implements Runnable {
       firstPlayUserName = firstUser.getUserGameName();
       secondPlayUserName = secondUser.getUserGameName();
     }
-
+    /* create a game record in database */
     sqlRoomID = GamingSQLAction.createGameRecord(gameID, firstPlayUserName, secondPlayUserName);
     gameMessagePrint("start a game");
 
