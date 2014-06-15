@@ -60,7 +60,6 @@ public class MatchingSQLAction {
       ConsoleLog.gameIDPrint(gameID, "there have " + gameList.length() + " people matching");
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_GETLIST, gameID);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -77,7 +76,6 @@ public class MatchingSQLAction {
       query.executeUpdate();
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_JOIN_QUEUE, userGameID + ", " + gameID);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -151,7 +149,7 @@ public class MatchingSQLAction {
       query.setString(2, host);
       queryResult = query.executeQuery();
       if (queryResult.first()) {
-        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + "failed. (not available)");
+        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + " failed. (not available)");
         return PUTREQUEST_RESULT2;
       }
       
@@ -160,7 +158,7 @@ public class MatchingSQLAction {
       query.setString(2, gameID);
       queryResult = query.executeQuery();
       if(!queryResult.first()) {
-        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + "failed. (disconnected.)");
+        ConsoleLog.gameIDPrint(gameID, host + " send request to " + client + " failed. (disconnected.)");
         return PUTREQUEST_RESULT2;
       }
 
@@ -173,7 +171,6 @@ public class MatchingSQLAction {
 
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint("when putRequest in " + gameID);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }

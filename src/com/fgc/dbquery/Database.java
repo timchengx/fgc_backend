@@ -7,35 +7,33 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.fgc.tools.ConsoleLog;
 
-/* 
- * this class is handle the connection to MySQL (or MariaDB) 
- * also is a connection pool
+/*
+ * this class is handle the connection to MySQL (or MariaDB) also is a connection pool
  */
 public class Database implements Runnable {
   private static String connectionURL = null;
-  private static final String driverName = "com.mysql.jdbc.Driver";     // use mysql jdbc driver
-  private static int connectPoolSize;       // connection pool size
-  private static long threadSleepTime;      // interval of clean pool (ms)
+  private static final String driverName = "com.mysql.jdbc.Driver"; // use mysql jdbc driver
+  private static int connectPoolSize; // connection pool size
+  private static long threadSleepTime; // interval of clean pool (ms)
   private static boolean isRunning = false; // is connection pool running?
-  
-  /* 
-   * connection pool implementation
-   * usingPool for saving the connection that using by process currently
-   * availablePool is saving the available connection ready for process to use
+
+  /*
+   * connection pool implementation usingPool for saving the connection that using by process
+   * currently availablePool is saving the available connection ready for process to use
    */
   private static ConcurrentLinkedQueue<Connection> usingPool;
   private static ConcurrentLinkedQueue<Connection> availablePool;
 
-  /* 
-   * setup address, schema name, username and password for connect to database 
-   * also setup the connection pool size and interval of clean the pool
+  /*
+   * setup address, schema name, username and password for connect to database also setup the
+   * connection pool size and interval of clean the pool
    */
   public static void setDatabase(String location, String dbname, String username, String pass,
       int size, long sleep) {
     /* address of connect to database */
     connectionURL =
         "jdbc:mysql://" + location + "/" + dbname + "?user=" + username + "&password=" + pass;
-    
+
     connectPoolSize = size;
     threadSleepTime = sleep;
     /* initialize using & available pool */
@@ -45,8 +43,6 @@ public class Database implements Runnable {
       Class.forName(driverName).newInstance();
     } catch (Exception e) {
       ConsoleLog.errorPrint("Can't load" + driverName);
-      e.printStackTrace();
-      System.exit(-1);
     }
   }
 
@@ -65,19 +61,17 @@ public class Database implements Runnable {
       connection = DriverManager.getConnection(connectionURL);
     } catch (SQLException e) {
       ConsoleLog.errorPrint("Fail to open Database Connection");
-      System.exit(-1);
     }
     return connection;
   }
 
-  /* 
-   * get a connection from connection pool
-   * or if pool is no connection available
-   * create a new connection and return
+  /*
+   * get a connection from connection pool or if pool is no connection available create a new
+   * connection and return
    */
   public static Connection getConnection() {
     Connection connection = availablePool.poll();
-    if (connection == null) {   // if poll is no connection, create a new one
+    if (connection == null) { // if poll is no connection, create a new one
       connection = createConnection();
       usingPool.add(connection);
       ConsoleLog.println("A new SQL connection has been created, current connection: "
@@ -100,25 +94,27 @@ public class Database implements Runnable {
   @Override
   public void run() {
     while (true) {
-      /* 
-       * start clean when available pool is not empty 
-       * clean all available connection and recreate of it
+      /*
+       * start clean when available pool is not empty clean all available connection and recreate of
+       * it
        */
-      while (!availablePool.isEmpty()) {    
+      while (!availablePool.isEmpty()) {
         try {
           availablePool.remove().close();
         } catch (SQLException e) {
           ConsoleLog.errorPrint("Fail to close a SQL connection from pool");
-          e.printStackTrace();
         }
       }
-      for (int i = 0; i < connectPoolSize; i++)
-        availablePool.add(createConnection());
+      for (int i = 0; i < connectPoolSize; i++) {
+        Connection conn = createConnection();
+        if (conn != null)
+          availablePool.add(conn);
+      }
+
       try {
-        Thread.sleep(threadSleepTime);  // wait threadSleepTime before next clean
+        Thread.sleep(threadSleepTime); // wait threadSleepTime before next clean
       } catch (InterruptedException e) {
         ConsoleLog.errorPrint("Connection clean thread sleep fail");
-        e.printStackTrace();
       }
     }
   }

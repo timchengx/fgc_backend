@@ -39,10 +39,9 @@ public class LoginSQLCheck {
         query = dbConnection.prepareStatement(SQL_GAMEID);
         query.setString(1, gameID);
         queryResult = query.executeQuery();
-        if (!queryResult.first())
-          throw new LoginFailException("can't found gameID");
+        queryResult.first();
         if (queryResult.getInt(1) != 1)
-          throw new LoginFailException("duplicate gameID");
+          throw new LoginFailException("duplicate or can't found gameID");
 
         /* get user's game name id */
         query = dbConnection.prepareStatement(SQL_GETGAMENAME);
@@ -66,7 +65,6 @@ public class LoginSQLCheck {
       }
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint("token = " + token + " , gameID = " + gameID);
-      e.printStackTrace();
     } catch (LoginFailException e) {
       ConsoleLog.println("A user using " + token + " want to get in " + gameID + " fail. ("
           + e.getMessage() + ")");
@@ -89,7 +87,6 @@ public class LoginSQLCheck {
       }
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_GETGAMEID, gameID);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }

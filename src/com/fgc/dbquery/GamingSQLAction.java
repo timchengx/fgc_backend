@@ -47,7 +47,6 @@ public class GamingSQLAction {
       query.executeUpdate();
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_REMOVE_QUEUE, userID + ", " + gameID);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -76,12 +75,10 @@ public class GamingSQLAction {
       query.setString(1, firstPlay);
       query.setString(2, secondPlay);
       ResultSet queryResult = query.executeQuery();
-      if (queryResult.first()) {
-        rid = queryResult.getInt(COLUMN_RID);
-      }
+      queryResult.first();
+      rid = queryResult.getInt(COLUMN_RID);
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_CREATE_RECORD, gameID + ", " + firstPlay + ", " + secondPlay);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -108,7 +105,6 @@ public class GamingSQLAction {
       query.executeUpdate();
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_ADD_RECORD, data + ", " + rid);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -126,7 +122,6 @@ public class GamingSQLAction {
       query.executeUpdate();
     } catch (SQLException e) {
       ConsoleLog.sqlErrorPrint(SQL_REMOVE_QUEUE, time.toString() + ", " + rid);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -148,7 +143,6 @@ public class GamingSQLAction {
     } catch (SQLException e) {
       ConsoleLog
           .sqlErrorPrint(SQL_REMOVE_QUEUE, QUEUE_TABLE + gameID + ", " + host + ", " + client);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -182,7 +176,6 @@ public class GamingSQLAction {
       }
     } catch (SQLException e) {
       ConsoleLog.errorPrint("in addGameCount with gameID = " + gameID + ", userID = " + userID);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
@@ -225,7 +218,6 @@ public class GamingSQLAction {
     } catch (SQLException e) {
       ConsoleLog.errorPrint("in setGameResult with gameID = " + gameID + ", userID = " + userID
           + "is this user win? " + win);
-      e.printStackTrace();
     } finally {
       Database.returnConnection(dbConnection);
     }
