@@ -12,12 +12,15 @@ import com.fgc.dbquery.Database;
 import com.fgc.dbquery.GamingSQLAction;
 
 public class GamingSQLTest {
+  
+  // setup database connection
   @Before
   public void setDB() {
     Database.setDatabase("140.134.27.124", "fgc", "root", "", 1, 100);
     Database.startDatabase();
   }
 
+  // removeQueue method test
   @Test
   public void removeQueueTest() throws SQLException {
     Connection conn = Database.getConnection();
@@ -27,12 +30,14 @@ public class GamingSQLTest {
     GamingSQLAction.removeFromQueue("fgcchess", "test1");
   }
 
+  // createGameRecord method test
   @Test
   public void createGameRecordTest() throws SQLException {
     GamingSQLAction.createGameRecord("fgcchess", "test1", "test2");
     GamingSQLAction.createGameRecord("error", "test1", "test2");
   }
 
+  // appendGameRecord method test
   @Test
   public void appendGameRecordTest() throws SQLException {
     int rid = GamingSQLAction.createGameRecord("fgcchess", "test1", "test2");
@@ -40,7 +45,8 @@ public class GamingSQLTest {
     GamingSQLAction.appendGameRecord(rid, "step2");
     GamingSQLAction.appendGameRecord(-1, "dummy");
   }
-
+  
+  // finishGame method Test
   @Test
   public void finishGameTest() {
     int rid = GamingSQLAction.createGameRecord("fgcchess", "test1", "test2");
@@ -48,6 +54,7 @@ public class GamingSQLTest {
     GamingSQLAction.finishGame(-1);
   }
 
+  // removeFromGameQueue method test
   @Test
   public void removeFromGameQueueTest() throws SQLException {
     Connection conn = Database.getConnection();
@@ -59,13 +66,16 @@ public class GamingSQLTest {
     GamingSQLAction.removeFromGameQueue("error", "test1", "test2");
     cleanGameHistory();
   }
-
+  
+  
+  // addGameCount method test
   @Test
   public void addGameCountTest() {
     GamingSQLAction.addGameCount("fgcChess", "test1");
     GamingSQLAction.addGameCount("error", "error");
   }
 
+  // 
   @Test
   public void setUserGameStatsTest() {
     GamingSQLAction.setUserGameStats("fgcChess", "test1", true);

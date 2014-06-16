@@ -24,14 +24,16 @@ public class MatchingSQLTest {
     fgc = new MatchingSQLAction("fgcchess");
   }
 
+  // joinGame & getList method Test
   @Test
-  public void joinGameAndgetListTest() throws SQLException {
+  public void joinGameAndGetListTest() throws SQLException {
     fgc.joinGame("test1");
     assertEquals("[{\"id\":\"test1\"}]", fgc.getList().toString());
     fgc.joinGame("error");
     deleteSQLEntry();
   }
 
+  // putRequest method test
   @Test
   public void putRequestTest() throws SQLException {
     fgc.joinGame("test1");

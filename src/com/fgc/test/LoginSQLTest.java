@@ -21,10 +21,11 @@ public class LoginSQLTest {
     Database.startDatabase();
   }
 
+  // login method test
   @Test
   public void loginTest() throws SQLException {
     LoginSQLCheck.login("error", "error");
-
+    // input test data for assert
     LoginSQLTest
         .setSQLEntry("UPDATE `fgc`.`user` SET `token`='123', `tokenDeadline`='2000-07-01 00:00:00' WHERE `uid`='14'");
     assertNull(LoginSQLCheck.login("123", "fgcChess"));
@@ -42,6 +43,7 @@ public class LoginSQLTest {
     assertNull(LoginSQLCheck.login("123", "JCG"));
   }
 
+  // fixGameID method test
   @Test
   public void fixGameIDTest() {
     assertEquals("fgcChess", LoginSQLCheck.fixGameName("fgcChess"));
