@@ -49,6 +49,10 @@ public class GameRoomSession implements Runnable {
         disconnect(SECOND_USER);
         return;
       }
+      if (secondUserData.has(FGCJSON.KEY_PUTITTHERE) && secondUserData.getBoolean(FGCJSON.KEY_PUTITTHERE)) {
+        writeToSQL(secondUserData);
+      }
+      
       gameMessagePrint(secondUser.getUserGameName() + " send " + secondUserData.toString());
       firstUser.send(secondUserData.toString());    // pass second user's data to first user
     }
